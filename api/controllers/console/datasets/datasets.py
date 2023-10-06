@@ -436,6 +436,87 @@ class DatasetApiBaseUrlApi(Resource):
         }
 
 
+
+
+
+class DatasetListOutApi(Resource):
+
+    @setup_required
+    @login_required
+    @account_initialization_required
+    def get(self):
+        page = request.args.get('page', default=1, type=int)
+        limit = request.args.get('limit', default=20, type=int)
+        ids = request.args.getlist('ids')
+        provider = request.args.get('provider', default="vendor")
+        if ids:
+            datasets, total = DatasetService.get_datasets_by_ids(ids, current_user.current_tenant_id)
+        else:
+            datasets, total = DatasetService.get_datasets(page, limit, provider,
+                                                          current_user.current_tenant_id, current_user)
+
+        # check embedding setting
+        provider_service = ProviderService()
+        valid_model_list = provider_service.get_valid_model_list(current_user.current_tenant_id,
+                                                                 ModelType.EMBEDDINGS.value)
+        # if len(valid_model_list) == 0:
+        #     raise ProviderNotInitializeError(
+        #         f"No Embedding Model available. Please configure a valid provider "
+        #         f"in the Settings -> Model Provider.")
+        model_names = []
+        for valid_model in valid_model_list:
+            model_names.append(f"{valid_model['model_name']}:{valid_model['model_provider']['provider_name']}")
+        data = marshal(datasets, dataset_detail_fields)
+        for item in data:
+            if item['indexing_technique'] == 'high_quality':
+                item_model = f"{item['embedding_model']}:{item['embedding_model_provider']}"
+                if item_model in model_names:
+                    item['embedding_available'] = True
+                else:
+                    item['embedding_available'] = False
+            else:
+                item['embedding_available'] = True
+        response = {
+            'data': data,
+            'has_more': len(datasets) == limit,
+            'limit': limit,
+            'total': total,
+            'page': page
+        }
+        return response, 200
+
+    @setup_required
+    @login_required
+    @account_initialization_required
+    def post(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('name', nullable=False, required=True,
+                            help='type is required. Name must be between 1 to 40 characters.',
+                            type=_validate_name)
+        parser.add_argument('indexing_technique', type=str, location='json',
+                            choices=('high_quality', 'economy'),
+                            help='Invalid indexing technique.')
+        args = parser.parse_args()
+
+        # The role of the current user in the ta table must be admin or owner
+        if current_user.current_tenant.current_role not in ['admin', 'owner']:
+            raise Forbidden()
+
+        try:
+            dataset = DatasetService.create_empty_dataset(
+                tenant_id=current_user.current_tenant_id,
+                name=args['name'],
+                indexing_technique=args['indexing_technique'],
+                account=current_user
+            )
+        except services.errors.dataset.DatasetNameDuplicateError:
+            raise DatasetNameDuplicateError()
+
+        return marshal(dataset, dataset_detail_fields), 201
+
+
+
+api.add_resource(DatasetListOutApi, '/datasets_out')
 api.add_resource(DatasetListApi, '/datasets')
 api.add_resource(DatasetApi, '/datasets/<uuid:dataset_id>')
 api.add_resource(DatasetQueryApi, '/datasets/<uuid:dataset_id>/queries')
