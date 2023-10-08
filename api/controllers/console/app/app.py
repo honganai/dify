@@ -34,12 +34,8 @@ def _get_app(app_id, tenant_id):
     return app
 
 
-class AppListApi(Resource):
+class AppListOutApi(Resource):
 
-    @setup_required
-    @login_required
-    @account_initialization_required
-    @marshal_with(app_pagination_fields)
     def get(self):
         """Get app list"""
         parser = reqparse.RequestParser()
@@ -48,7 +44,7 @@ class AppListApi(Resource):
         args = parser.parse_args()
 
         app_models = db.paginate(
-            db.select(App).where(App.tenant_id == current_user.current_tenant_id,
+            db.select(App).where(App.tenant_id == 'eabcc971-b1af-4844-8c43-0c2d2229339b',
                                  App.is_universal == False).order_by(App.created_at.desc()),
             page=args['page'],
             per_page=args['limit'],
@@ -56,9 +52,6 @@ class AppListApi(Resource):
 
         return app_models
 
-    @setup_required
-    @login_required
-    @account_initialization_required
     @marshal_with(app_detail_fields)
     def post(self):
         """Create app"""
@@ -369,6 +362,153 @@ class AppCopy(Resource):
         return copy_app, 201
 
 
+class AppListApi(Resource):
+
+    @setup_required
+    @login_required
+    @account_initialization_required
+    @marshal_with(app_pagination_fields)
+    def get(self):
+        """Get app list"""
+        parser = reqparse.RequestParser()
+        parser.add_argument('page', type=inputs.int_range(1, 99999), required=False, default=1, location='args')
+        parser.add_argument('limit', type=inputs.int_range(1, 100), required=False, default=20, location='args')
+        args = parser.parse_args()
+
+        app_models = db.paginate(
+            db.select(App).where(App.tenant_id == current_user.current_tenant_id,
+                                 App.is_universal == False).order_by(App.created_at.desc()),
+            page=args['page'],
+            per_page=args['limit'],
+            error_out=False)
+
+        return app_models
+
+    @setup_required
+    @login_required
+    @account_initialization_required
+    @marshal_with(app_detail_fields)
+    def post(self):
+        """Create app"""
+        parser = reqparse.RequestParser()
+        parser.add_argument('name', type=str, required=True, location='json')
+        parser.add_argument('mode', type=str, choices=['completion', 'chat'], location='json')
+        parser.add_argument('icon', type=str, location='json')
+        parser.add_argument('icon_background', type=str, location='json')
+        parser.add_argument('model_config', type=dict, location='json')
+        args = parser.parse_args()
+
+        # The role of the current user in the ta table must be admin or owner
+        if current_user.current_tenant.current_role not in ['admin', 'owner']:
+            raise Forbidden()
+
+        try:
+            default_model = ModelFactory.get_text_generation_model(
+                tenant_id=current_user.current_tenant_id
+            )
+        except (ProviderTokenNotInitError, LLMBadRequestError):
+            default_model = None
+        except Exception as e:
+            logging.exception(e)
+            default_model = None
+
+        if args['model_config'] is not None:
+            # validate config
+            model_config_dict = args['model_config']
+
+            # get model provider
+            model_provider = ModelProviderFactory.get_preferred_model_provider(
+                current_user.current_tenant_id,
+                model_config_dict["model"]["provider"]
+            )
+
+            if not model_provider:
+                if not default_model:
+                    raise ProviderNotInitializeError(
+                        f"No Default System Reasoning Model available. Please configure "
+                        f"in the Settings -> Model Provider.")
+                else:
+                    model_config_dict["model"]["provider"] = default_model.model_provider.provider_name
+                    model_config_dict["model"]["name"] = default_model.name
+
+            model_configuration = AppModelConfigService.validate_configuration(
+                tenant_id=current_user.current_tenant_id,
+                account=current_user,
+                config=model_config_dict,
+                mode=args['mode']
+            )
+
+            app = App(
+                enable_site=True,
+                enable_api=True,
+                is_demo=False,
+                api_rpm=0,
+                api_rph=0,
+                status='normal'
+            )
+
+            app_model_config = AppModelConfig()
+            app_model_config = app_model_config.from_model_config_dict(model_configuration)
+        else:
+            if 'mode' not in args or args['mode'] is None:
+                abort(400, message="mode is required")
+
+            model_config_template = model_templates[args['mode'] + '_default']
+
+            app = App(**model_config_template['app'])
+            app_model_config = AppModelConfig(**model_config_template['model_config'])
+
+            # get model provider
+            model_provider = ModelProviderFactory.get_preferred_model_provider(
+                current_user.current_tenant_id,
+                app_model_config.model_dict["provider"]
+            )
+
+            if not model_provider:
+                if not default_model:
+                    raise ProviderNotInitializeError(
+                        f"No Default System Reasoning Model available. Please configure "
+                        f"in the Settings -> Model Provider.")
+                else:
+                    model_dict = app_model_config.model_dict
+                    model_dict['provider'] = default_model.model_provider.provider_name
+                    model_dict['name'] = default_model.name
+                    app_model_config.model = json.dumps(model_dict)
+
+        app.name = args['name']
+        app.mode = args['mode']
+        app.icon = args['icon']
+        app.icon_background = args['icon_background']
+        app.tenant_id = current_user.current_tenant_id
+
+        db.session.add(app)
+        db.session.flush()
+
+        app_model_config.app_id = app.id
+        db.session.add(app_model_config)
+        db.session.flush()
+
+        app.app_model_config_id = app_model_config.id
+
+        account = current_user
+
+        site = Site(
+            app_id=app.id,
+            title=app.name,
+            default_language=account.interface_language,
+            customize_token_strategy='not_allow',
+            code=Site.generate_code(16)
+        )
+
+        db.session.add(site)
+        db.session.commit()
+
+        app_was_created.send(app)
+
+        return app, 201
+
+
+api.add_resource(AppListOutApi, '/out_apps')
 api.add_resource(AppListApi, '/apps')
 api.add_resource(AppTemplateApi, '/app-templates')
 api.add_resource(AppApi, '/apps/<uuid:app_id>')
