@@ -51,5 +51,6 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             date
-            # docker rm -fi ${{ env.REPO_NAME }}
-            # docker run -d --name ${{ env.REPO_NAME }} ${{ vars.REGISTRY }}/${{ vars.REGISTRY_GROUP }}/${{ env.REPO_NAME }}:${{ env.IMAGE_TAG }}
+            docker login ${{ vars.REGISTRY }} -u ${{ secrets.REGISTRY_USERNAME }} -p ${{ secrets.REGISTRY_PASSWORD }}
+            #docker rm -fi ${{ env.REPO_NAME }}
+            #docker run -d --name ${{ env.REPO_NAME }} ${{ vars.REGISTRY }}/${{ vars.REGISTRY_GROUP }}/${{ env.REPO_NAME }}:${{ env.IMAGE_TAG }}
