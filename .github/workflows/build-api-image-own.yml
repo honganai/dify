@@ -52,5 +52,8 @@ jobs:
           script: |
             date
             docker login ${{ vars.REGISTRY }} -u ${{ secrets.REGISTRY_USERNAME }} -p ${{ secrets.REGISTRY_PASSWORD }}
-            #docker rm -fi ${{ env.REPO_NAME }}
-            #docker run -d --name ${{ env.REPO_NAME }} ${{ vars.REGISTRY }}/${{ vars.REGISTRY_GROUP }}/${{ env.REPO_NAME }}:${{ env.IMAGE_TAG }}
+            cd /root/dify/docker
+            sed -i "s/^TAG=.*/TAG=${{ env.IMAGE_TAG }}/" .env
+            # web暂时在这儿一起升级了
+            docker-compose up api web worker -d
+      
