@@ -118,9 +118,10 @@ class DatasetProcessRule(db.Model):
             {'id': 'remove_extra_spaces', 'enabled': True},
             {'id': 'remove_urls_emails', 'enabled': False}
         ],
+        # 预设一个不存在的分隔符 不需要对内容进行拆分 除非达到3000的上限
         'segmentation': {
-            'delimiter': '\n',
-            'max_tokens': 1000
+            'delimiter': '\n\n\n',
+            'max_tokens': 3000
         }
     }
 
