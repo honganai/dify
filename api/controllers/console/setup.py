@@ -14,7 +14,7 @@ from libs.password import valid_password
 from . import api
 from .error import AlreadySetupError, NotSetupError
 from .wraps import only_edition_self_hosted
-from api.controllers.service_api.app.app import current_tenant_id
+from controllers.service_api.app.app import current_tenant_id
 
 
 class SetupApi(Resource):
