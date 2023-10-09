@@ -2,7 +2,7 @@ name: ci
 on:
   workflow_dispatch: #github页面手动触发
   push:
-    branches: [ "dev", "main" ]
+    branches: [ "develop", "main" ]
     tags:
       - "v*.*.*"
 
