@@ -224,9 +224,9 @@ class AccountService:
 class TenantService:
 
     @staticmethod
-    def create_tenant(name: str) -> Tenant:
+    def create_tenant(name: str, id: str = None) -> Tenant:
         """Create tenant"""
-        tenant = Tenant(name=name)
+        tenant = Tenant(name=name) if id is None else Tenant(name=name, id=id)
 
         db.session.add(tenant)
         db.session.commit()
@@ -419,7 +419,7 @@ class RegisterService:
         return f'member_invite:token:{token}'
 
     @classmethod
-    def register(cls, email, name, password: str = None, open_id: str = None, provider: str = None) -> Account:
+    def register(cls, email, name, password: str = None, open_id: str = None, provider: str = None, tenant_id: str = None) -> Account:
         db.session.begin_nested()
         """Register account"""
         try:
@@ -430,7 +430,7 @@ class RegisterService:
             if open_id is not None or provider is not None:
                 AccountService.link_account_integrate(provider, open_id, account)
 
-            tenant = TenantService.create_tenant(f"{account.name}'s Workspace")
+            tenant = TenantService.create_tenant(name=f"{account.name}'s Workspace", id=tenant_id)
 
             TenantService.create_tenant_member(tenant, account, role='owner')
             account.current_tenant = tenant
