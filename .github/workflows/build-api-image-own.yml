@@ -43,7 +43,8 @@ jobs:
 
       - name: Deploy to Test Server
         uses: appleboy/ssh-action@v1.0.0
-        if: github.ref == 'refs/heads/main'
+        # 部署到测试环境
+        if: github.ref == 'refs/heads/develop'
         with:
           host: ${{ vars.SSH_HOST }}
           port: ${{ vars.SSH_PORT }}
