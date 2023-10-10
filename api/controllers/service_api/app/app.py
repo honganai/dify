@@ -104,7 +104,6 @@ class AppListApi(Resource):
                 'mode': app_model.mode,
                 'icon': app_model.icon,
                 'icon_background': app_model.icon_background,
-                'model_config': app_model.app_model_config.to_model_config_dict()
             } for app_model in app_models.items]
         }
 
