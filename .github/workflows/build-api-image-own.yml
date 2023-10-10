@@ -43,7 +43,8 @@ jobs:
 
       - name: Deploy to Test Server
         uses: appleboy/ssh-action@v1.0.0
-        if: github.ref == 'refs/heads/main'
+        # 部署到测试环境
+        if: github.ref == 'refs/heads/develop'
         with:
           host: ${{ vars.SSH_HOST }}
           port: ${{ vars.SSH_PORT }}
@@ -52,5 +53,9 @@ jobs:
           script: |
             date
             docker login ${{ vars.REGISTRY }} -u ${{ secrets.REGISTRY_USERNAME }} -p ${{ secrets.REGISTRY_PASSWORD }}
-            #docker rm -fi ${{ env.REPO_NAME }}
-            #docker run -d --name ${{ env.REPO_NAME }} ${{ vars.REGISTRY }}/${{ vars.REGISTRY_GROUP }}/${{ env.REPO_NAME }}:${{ env.IMAGE_TAG }}
+            cd /root/dify/docker
+            sed -i "s/^TAG=.*/TAG=${{ env.IMAGE_TAG }}/" .env
+            # web暂时在这儿一起升级了
+            docker-compose down
+            docker-compose up -d
+      

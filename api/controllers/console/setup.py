@@ -15,6 +15,7 @@ from . import api
 from .error import AlreadySetupError, NotSetupError
 from .wraps import only_edition_self_hosted
 
+current_tenant_id = "eabcc971-b1af-4844-8c43-0c2d2229339b"
 
 class SetupApi(Resource):
 
@@ -53,6 +54,7 @@ class SetupApi(Resource):
         account = RegisterService.register(
             email=args['email'],
             name=args['name'],
+            tenant_id=current_tenant_id,
             password=args['password']
         )
 
