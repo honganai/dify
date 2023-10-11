@@ -34,8 +34,8 @@ class WeaviateService:
                 timeout_config=(5, 60),
                 startup_period=None,
                 additional_headers = {
-                "X-OpenAI-Api-Key": current_app.config.get('WEAVIATE_ENDPOINT'),  # Replace with your inference API key
-                 }
+                "X-OpenAI-Api-Key": current_app.config.get('HOSTED_OPENAI_API_KEY'),  # Replace with your inference API key
+                }
             )
         except requests.exceptions.ConnectionError:
             raise ConnectionError('Vector database connection error')
