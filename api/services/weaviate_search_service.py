@@ -256,4 +256,4 @@ class WeaviateService:
             .do()
         )
         print(json.dumps(response, indent=4, ensure_ascii=False))
-        return (json.dumps(response, indent=4, ensure_ascii=False))
+        return response
