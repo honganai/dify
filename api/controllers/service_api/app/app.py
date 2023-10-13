@@ -4,7 +4,7 @@ import logging
 from werkzeug.exceptions import NotFound
 import flask_restful
 from flask import request
-from flask_login import current_user
+# from flask_login import current_user
 from flask_restful import fields, marshal_with, reqparse, inputs, abort, Resource
 
 from constants.model_template import model_templates
@@ -147,7 +147,8 @@ class AppListApi(Resource):
                 else:
                     model_config_dict["model"]["provider"] = default_model.model_provider.provider_name
                     model_config_dict["model"]["name"] = default_model.name
-
+            current_user = db.session.query(Account).first()
+            current_user.current_tenant_id = current_tenant_id
             model_configuration = AppModelConfigService.validate_configuration(
                 tenant_id=current_tenant_id,
                 account=current_user,
