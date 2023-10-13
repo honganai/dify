@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import time
 from typing import List, Dict, Any
 
@@ -34,7 +35,7 @@ class WeaviateService:
                 timeout_config=(5, 60),
                 startup_period=None,
                 additional_headers = {
-                "X-OpenAI-Api-Key": current_app.config.get('HOSTED_OPENAI_API_KEY'),  # Replace with your inference API key
+                "X-OpenAI-Api-Key": config.open_api_key,  # Replace with your inference API key
                 }
             )
         except requests.exceptions.ConnectionError:
@@ -222,29 +223,35 @@ class WeaviateService:
 
     def batch_import_data(self,class_name: str, data: json):
         self._client.batch.configure(batch_size=100)  # Configure batch
-        with self._client.batch as batch:  # Initialize a batch process
-            for i, d in enumerate(data):  # Batch import data
-                print(f"importing question: {i+1}")
-                properties = {
-                    "article_id": d["Article_id"],
-                    "summary": d["Summary"],
-                    "keypoint": d["Keypoints"],
-                    "user_id": d["UserId"],
-                }
-                batch.add_data_object(
-                    data_object=properties,
-                    class_name=class_name
-                )
+        try:
+            with self._client.batch as batch:  # Initialize a batch process
+                for i, d in enumerate(data):  # Batch import data
+                    print(f"importing question: {i+1}")
+                    properties = {
+                        "article_id": d["Article_id"],
+                        "summary": d["Summary"],
+                        "keypoint": d["Keypoints"],
+                        "user_id": d["UserId"],
+                    }
+                    batch.add_data_object(
+                        data_object=properties,
+                        class_name=class_name
+                    )
+        except Exception as e:
+            logging.exception("batch_import_data failed,?",{e.message})
+            raise e
 
     # ===== import data =====
 
     #### query ####
     def search(self,classname:str,query:str,user_id:str,limit:10):
+        #query去掉所有除中英文以外的字符
+        clean_query = re.sub(r'[^\w\s]', '', query)
         response = (
             self._client.query
             .get(classname, ["article_id", "summary", "keypoint","user_id"])
             .with_hybrid(
-                query=query
+                query=clean_query
             )
             .with_where({
                 "path": ["user_id"],
@@ -257,3 +264,26 @@ class WeaviateService:
         )
         print(json.dumps(response, indent=4, ensure_ascii=False))
         return response
+
+    def batch_search(self,classname:str,query_list:list,user_id:str,limit:3):
+        result= []
+        for query in query_list:
+            response = (
+                self._client.query
+                .get(classname, ["article_id", "summary", "keypoint","user_id"])
+                .with_hybrid(
+                    query=query
+                )
+                .with_where({
+                    "path": ["user_id"],
+                    "operator": "Equal",
+                    "valueText": user_id
+                })
+                .with_additional("score")
+                .with_limit(limit)
+                .do()
+            )
+            result.append(response)
+
+        print(json.dumps(result,ensure_ascii=False))
+        return result

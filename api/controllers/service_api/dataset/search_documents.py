@@ -141,7 +141,8 @@ class SearchSegmentApi(DatasetApiResource):
         config=WeaviateConfig(
             endpoint=current_app.config.get('WEAVIATE_ENDPOINT'),
             api_key=current_app.config.get('WEAVIATE_API_KEY'),
-            batch_size=int(current_app.config.get('WEAVIATE_BATCH_SIZE'))
+            batch_size=int(current_app.config.get('WEAVIATE_BATCH_SIZE')),
+            open_api_key=current_app.config.get(current_app.config.get('HOSTED_OPENAI_API_KEY'))
         )
         warviate=WeaviateService(config)
         parser = reqparse.RequestParser()

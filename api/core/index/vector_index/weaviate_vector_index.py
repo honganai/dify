@@ -17,6 +17,7 @@ class WeaviateConfig(BaseModel):
     endpoint: str
     api_key: Optional[str]
     batch_size: int = 100
+    open_api_key: Optional[str]
 
     @root_validator()
     def validate_config(cls, values: dict) -> dict:
