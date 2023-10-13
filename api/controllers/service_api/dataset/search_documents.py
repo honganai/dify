@@ -21,7 +21,7 @@ from fields.hit_testing_fields import hit_testing_record_fields
 from services.dataset_service import DatasetService
 from services.hit_testing_service import HitTestingService
 from services.weaviate_search_service import WeaviateService
-from flask import current_app
+from flask import current_app, json
 
 
 class SearchDocumentApi(DatasetApiResource):
@@ -94,23 +94,47 @@ class CreateSegmentApi(DatasetApiResource):
             api_key=current_app.config.get('WEAVIATE_API_KEY'),
             batch_size=int(current_app.config.get('WEAVIATE_BATCH_SIZE'))
         )
-        warviate=WeaviateService(config)
+        weaviate=WeaviateService(config)
         parser = reqparse.RequestParser()
         parser.add_argument('Article_id', type=str, required=True, nullable=True, location='json')
         parser.add_argument('Summary', type=str, required=True, nullable=True, location='json')
         parser.add_argument('Keypoints', type=str, required=True, nullable=False, location='json')
         parser.add_argument('UserId', type=str, default='', required=True, nullable=False, location='json')
-        parser.add_argument('class_name', type=str, default='dataset_keypoints_all_user', required=False, nullable=True,
+        parser.add_argument('ClassName', type=str, default='dataset_keypoints_all_user', required=False, nullable=True,
                             location='json')
         args = parser.parse_args()
         article_id = args['Article_id']
         summary = args['Summary']
         keypoint = args['Keypoints']
         user_id = args['UserId']
-        class_name = args['class_name']
+        class_name = args['ClassName']
 
-        segment_uuid = warviate.single_import_data(class_name, article_id, summary, keypoint, user_id)
+        segment_uuid = weaviate.single_import_data(class_name, article_id, summary, keypoint, user_id)
         return segment_uuid,200
+
+
+class BatchCreateSegmentApi(DatasetApiResource):
+    def post(self, tenant_id):
+        config=WeaviateConfig(
+            endpoint=current_app.config.get('WEAVIATE_ENDPOINT'),
+            api_key=current_app.config.get('WEAVIATE_API_KEY'),
+            batch_size=int(current_app.config.get('WEAVIATE_BATCH_SIZE'))
+        )
+        weaviate=WeaviateService(config)
+        parser = reqparse.RequestParser()
+        parser.add_argument('data', type=json, required=True, nullable=True, location='json')
+        parser.add_argument('ClassName', type=str, default='dataset_keypoints_all_user', required=False, nullable=True,
+                            location='json')
+        args = parser.parse_args()
+        data = args['data']
+        class_name = args['ClassName']
+        try:
+            weaviate.batch_import_data(class_name, data)
+        except Exception as e:
+            logging.exception("BatchCreateSegmentApi failed.")
+            return "batch uploading failed", 500
+        return "batch uploading", 200
+
 
 class SearchSegmentApi(DatasetApiResource):
     def post(self, tenant_id):
@@ -124,18 +148,18 @@ class SearchSegmentApi(DatasetApiResource):
         parser.add_argument('Query', type=str, required=True, nullable=False, location='json')
         parser.add_argument('Limit', type=int, default=10, required=False, nullable=False, location='json')
         parser.add_argument('UserId', type=str, default='', required=True, nullable=False, location='json')
-        parser.add_argument('class_name', type=str, default='dataset_keypoints_all_user', required=False, nullable=True,
+        parser.add_argument('ClassName', type=str, default='dataset_keypoints_all_user', required=False, nullable=True,
                             location='json')
         args = parser.parse_args()
         query = args['Query']
         user_id= args['UserId']
         limit = args['Limit']
-        class_name = args['class_name']
+        class_name = args['ClassName']
 
         return warviate.search(class_name,query,user_id,limit),200
 
 
-
+api.add_resource(BatchCreateSegmentApi, '/datasets/batch_create_segment')
 api.add_resource(SearchSegmentApi, '/datasets/search_segment')
 api.add_resource(CreateSegmentApi, '/datasets/create_segment')
 api.add_resource(SearchDocumentApi, '/datasets/<uuid:dataset_id>/search_document')
