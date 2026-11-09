@@ -4,6 +4,7 @@ from typing import cast
 from core.app.apps.base_app_queue_manager import AppQueueManager
 from core.app.apps.base_app_runner import AppRunner
 from core.app.apps.completion.app_config_manager import CompletionAppConfig
+from core.app.apps.postplus_route_context import postplus_model_parameters
 from core.app.entities.app_invoke_entities import (
     CompletionAppGenerateEntity,
 )
@@ -165,7 +166,12 @@ class CompletionAppRunner(AppRunner):
 
         invoke_result = model_instance.invoke_llm(
             prompt_messages=prompt_messages,
-            model_parameters=application_generate_entity.model_conf.parameters,
+            model_parameters=postplus_model_parameters(
+                application_generate_entity.model_conf.provider,
+                application_generate_entity.model_conf.parameters,
+                app_record.id,
+                message.id,
+            ),
             stop=stop,
             stream=application_generate_entity.stream,
             user=application_generate_entity.user_id,
