@@ -178,7 +178,7 @@ class LargeLanguageModel(AIModel):
                     model=model,
                     prompt_messages=prompt_messages,
                     message=AssistantPromptMessage(
-                        content=content or content_list,
+                        content=content if content or not content_list else content_list,
                         tool_calls=tools_calls,
                     ),
                     usage=usage,
