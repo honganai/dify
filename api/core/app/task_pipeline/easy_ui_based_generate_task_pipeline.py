@@ -372,6 +372,8 @@ class EasyUIBasedGenerateTaskPipeline(BasedGenerateTaskPipeline, MessageCycleMan
         message.provider_response_latency = time.perf_counter() - self._start_at
         message.total_price = usage.total_price
         message.currency = usage.currency
+        if self._model_config.provider == "yuanma/yuanma_extended/yuanma_extended" and self._model_config.model == "gpt-6-luna":
+            self._task_state.metadata["usage"] = self._usage_metadata()
         message.message_metadata = (
             json.dumps(jsonable_encoder(self._task_state.metadata)) if self._task_state.metadata else None
         )
@@ -418,12 +420,31 @@ class EasyUIBasedGenerateTaskPipeline(BasedGenerateTaskPipeline, MessageCycleMan
             model, credentials, prompt_tokens, completion_tokens
         )
 
+    def _usage_metadata(self) -> dict:
+        result = self._task_state.llm_result
+        usage = jsonable_encoder(result.usage)
+        # Only a completed plugin result carries this local routing fingerprint.
+        # Stopped/direct-answer paths have no marker and remain unattributed.
+        fingerprint = result.system_fingerprint or ""
+        prefix = "yuanma-credit-route/v1:"
+        if (self._model_config.provider == "yuanma/yuanma_extended/yuanma_extended"
+                and self._model_config.model == "gpt-6-luna"
+                and fingerprint.startswith(prefix)):
+            slot = fingerprint.removeprefix(prefix)
+            if slot == "tokenify":
+                usage.update(model_name="gpt-6-luna-tokenify", actual_provider="Tokenify",
+                             provider_route=slot, cost_basis="supplier_quote_70pct_estimate")
+            elif slot in {"paid", *(f"credit_{i}" for i in range(1, 9))}:
+                usage.update(model_name="gpt-6-luna", actual_provider="OpenAI",
+                             provider_route=slot, cost_basis="catalog_estimate")
+        return usage
+
     def _message_end_to_stream_response(self) -> MessageEndStreamResponse:
         """
         Message end to stream response.
         :return:
         """
-        self._task_state.metadata["usage"] = jsonable_encoder(self._task_state.llm_result.usage)
+        self._task_state.metadata["usage"] = self._usage_metadata()
 
         extras = {}
         if self._task_state.metadata:

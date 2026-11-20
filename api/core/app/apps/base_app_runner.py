@@ -311,6 +311,7 @@ class AppRunner:
         prompt_messages: list[PromptMessage] = []
         text = ""
         usage = None
+        system_fingerprint = None
         for result in invoke_result:
             if not agent:
                 queue_manager.publish(QueueLLMChunkEvent(chunk=result), PublishFrom.APPLICATION_MANAGER)
@@ -325,6 +326,9 @@ class AppRunner:
             if not prompt_messages:
                 prompt_messages = result.prompt_messages
 
+            if result.system_fingerprint:
+                system_fingerprint = result.system_fingerprint
+
             if result.delta.usage:
                 usage = result.delta.usage
 
@@ -332,7 +336,8 @@ class AppRunner:
             usage = LLMUsage.empty_usage()
 
         llm_result = LLMResult(
-            model=model, prompt_messages=prompt_messages, message=AssistantPromptMessage(content=text), usage=usage
+            model=model, prompt_messages=prompt_messages, message=AssistantPromptMessage(content=text), usage=usage,
+            system_fingerprint=system_fingerprint
         )
 
         queue_manager.publish(
